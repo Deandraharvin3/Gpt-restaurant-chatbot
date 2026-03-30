@@ -7,7 +7,7 @@ client = OpenAI(
 
 def chat_with_gpt(messages):
     response = client.responses.create(
-    model="gpt-5-nano",
+    model="gpt-5",
     tools=[{
         "type": "web_search",
         "user_location": {
@@ -29,3 +29,10 @@ def chat_with_gpt(messages):
     input=messages,
     )
     return response.output_text
+
+def voice_chat_with_gpt(audio_value):
+    response = client.audio.transcriptions.create(
+        model="whisper-1",
+        file = audio_value
+    )
+    return response
