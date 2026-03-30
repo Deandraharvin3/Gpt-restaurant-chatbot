@@ -16,15 +16,15 @@ def chat_with_gpt(messages):
             "city": "Baltimore",
             "region": "Maryland",
         },
-        "filters":{
-            "allowed_domains": [
-                "www.google.com",
-                "www.opentable.com",
-                "www.eater.com",
-                "www.baltimoremagazine.com",
-                "www.yelp.com",
-            ]
-        }
+        # "filters":{
+        #     "allowed_domains": [
+        #         "www.google.com",
+        #         "www.opentable.com",
+        #         "www.eater.com",
+        #         "www.baltimoremagazine.com",
+        #         "www.yelp.com",
+        #     ]
+        # }
     }],
     input=messages,
     )
