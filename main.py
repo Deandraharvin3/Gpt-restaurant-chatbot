@@ -1,147 +1,275 @@
 import streamlit as st
-from chatbot import chat_with_gpt, voice_chat_with_gpt
-# from text_chat import render_text_chat
-# from voice_chat import render_voice_chat
+from chatbot import chat_with_gpt, voice_chat_with_gpt, get_google_place_photo
 
-# st.set_page_config(page_title="Chef Dee AI", page_icon="🍽️", layout="wide")
+st.set_page_config(page_title="Chef's Table", page_icon="🍽️", layout="centered")
 
-# tab1, tab2 = st.tabs(["Text Chat", "Voice Chat"])
+def inject_foodie_css():
+    st.markdown("""
+    <style>
+        :root {
+            --chef-red: #D32F2F; 
+            --review-gold: #FFC107;
+            --user-bg: #F5F5F5;
+            --text-dark: #212121;
+        }
+
+        .stChatMessage {
+            border-radius: 20px !important;
+            padding: 15px !important;
+            margin-bottom: 12px !important;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        
+        div[data-testid="stChatMessage"]:nth-child(odd) {
+            background-color: var(--user-bg);
+            color: var(--text-dark);
+            border: 1px solid #E0E0E0;
+        }
+
+        div[data-testid="stChatMessage"]:nth-child(even) {
+            background-color: #FFF3E0;
+            border-left: 5px solid var(--chef-red);
+        }
+
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+    </style>
+    """, unsafe_allow_html=True)
+
+inject_foodie_css()
+
+if "chef_messages" not in st.session_state:
+    st.session_state.chef_messages = []
+if "rev_messages" not in st.session_state:
+    st.session_state.rev_messages = []
+if "macro_messages" not in st.session_state:
+    st.session_state.macro_messages = []
+if "date_messages" not in st.session_state:
+    st.session_state.date_messages = []
+if "roulette_messages" not in st.session_state:
+    st.session_state.roulette_messages = []
+
+def run_chat_session(state_key, system_prompt, welcome_message, audio_label, text_label, key_prefix, assistant_avatar="🤖", custom_action=None, bg_color="#FFFFFF"):
+
+    st.markdown(
+        "<style>.stApp { background-color: " + bg_color + " !important; }</style>", 
+        unsafe_allow_html=True
+    )    
+    if not st.session_state[state_key]:
+        st.session_state[state_key] = [system_prompt]
+        st.session_state[state_key].append({"role": "assistant", "content": welcome_message})
+
+    chat_container = st.container()
+    
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        audio_value = st.audio_input(audio_label, key=key_prefix + "_audio")
+    with col2:
+        text_prompt = st.chat_input(text_label, key=key_prefix + "_text")
+
+    final_prompt = None
+    if audio_value:
+        with st.spinner("Listening..."):
+            transcript = voice_chat_with_gpt(audio_value)
+            final_prompt = transcript.text
+    elif text_prompt:
+        final_prompt = text_prompt
+
+    with chat_container:
+        for message in st.session_state[state_key][1:]:
+            avatar = assistant_avatar if message["role"] == "assistant" else "👤"
+            with st.chat_message(message["role"], avatar=avatar):
+                st.markdown(message["content"])
+
+        if final_prompt:
+            st.session_state[state_key].append({"role": "user", "content": final_prompt})
+            with st.chat_message("user", avatar="👤"):
+                st.markdown(final_prompt)
+
+            with st.chat_message("assistant", avatar=assistant_avatar):
+                with st.spinner("Thinking..."):
+                    response = chat_with_gpt(st.session_state[state_key])
+                st.markdown(response)
+
+                if custom_action:
+                    custom_action(final_prompt)
+
+            st.session_state[state_key].append({"role": "assistant", "content": response})
 
 def render_text_chat():
-    st.markdown(f"# {list(page_names_to_funcs.keys())[0]} 🍽️")
-    st.set_page_config(
-        page_title="Chef Dee's AI Kitchen 🍽️",
-        page_icon="🍳",
-        layout="centered"
-    )
-
-    # st.markdown("""
-    # <style>
-    #     .stChatMessage {
-    #         border-radius: 12px;
-    #         padding: 10px;
-    #         margin-bottom: 10px;
-    #     }
-    #     .stChatMessage.user {
-    #         background-color: #f0f2f6;
-    #     }
-    #     .stChatMessage.assistant {
-    #         background-color: #ffe4e1;
-    #     }
-    # </style>
-    # """, unsafe_allow_html=True)
-
-    st.title("Gordon Ramsay Restaurant Chatbot")
-    st.write("I am here to help you find the best restaurants. You can ask me for restaurant recommendations, information about specific restaurants, or any other restaurant-related questions you may have. Let's get started!")
+    st.title("🔥 Chef Dee's Kitchen")
+    st.caption("Don't be a donkey. Tell me what you're craving.")
 
     system_prompt = {
         "role": "system",
-        "content": "You are Gordon Ramsay, a famous chef and restaurateur and you are here to help users find the best restaurants. "
-                    "You are Gordon Ramsay but adapted as Chef Dee: bold, witty, slightly sarcastic but never rude. You must stay consistent in tone across all responses."
-                "You cannot handle requests that are not related to restaurants. "
-                    "If a user asks something unrelated to restaurants, you must refuse in Gordon Ramsay style and redirect back to food."
-                    "Make the interaction as human and engaging as possible. Remember to be helpful and provide accurate information. If you don't know the answer, say you don't know instead of making something up."
-                    "Every response MUST include at least one follow-up question to refine recommendations. Never skip this."
-                    "You are allowed to show images of the restaurants you recommend and you can also provide links to the restaurant's website or menu if available. "
-                    "You should guide the user step-by-step through choosing a restaurant by asking structured questions if they are unsure."
-                    "Keep all responses concise and to the point, ideally under 150 words. Always end with a follow-up question to keep the conversation going. I need you to be engaging and make the user feel like they are talking to a real person, not a robot. Make the conversation more fun!"
+        "content": (
+            "You are Chef Dee, an elite, fiery, Gordon Ramsay-style executive chef. "
+            "Your tone is bold, witty, and slightly sarcastic but never rude. "
+            "RULES: "
+            "1. You are strictly a restaurant and food expert. "
+            "2. OUT OF SCOPE GUARDRAIL: If a user asks about the weather, sports, politics, math, or ANY topic unrelated to dining out or food, you MUST refuse to answer. "
+            "3. REFUSAL BEHAVIOR: Refuse in character. (e.g., 'Do I look like a bloody meteorologist? I am a chef. Are we talking about food or are you going to waste my time?') "
+            "4. Every response MUST include at least one follow-up question to refine recommendations. "
+            "5. Never say 'I don't know' weakly. Say 'I haven't cooked there, mate, so I won't lie to you.'"
+        )
     }
+    welcome = "I'm Chef Dee 🔥 Let's find you something incredible.\n\nTell me:\n1. What are you craving?\n2. Budget?\n3. Dine-in or takeout?"
 
-    if "messages" not in st.session_state:
-        st.session_state.messages = [system_prompt]
-
-    if len(st.session_state.messages) == 1:
-        welcome_msg = """
-            I'm Chef Ramsay 🔥
-            Let's find you something incredible.
-
-            Tell me:
-            1. What are you craving?
-            2. Budget?
-            3. Dine-in or takeout?
-        """
-        st.session_state.messages.append({"role": "assistant", "content": welcome_msg})
-    for message in st.session_state.messages[1:]:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-    if prompt := st.chat_input("Type your message here..."):
-        print("User input:", prompt)
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                response = chat_with_gpt(st.session_state.messages)
-            st.write(response)
-
-        st.session_state.messages.append({"role": "assistant", "content": response})
-
-
-def render_voice_chat():
-    st.markdown(f"# {list(page_names_to_funcs.keys())[1]} 🎤")
-    # st.logo(
-    # "logo.png",
-    # size="medium",
-    # link="https://platform.openai.com/docs",
-    # )
-
-    st.title("Transcription with Whisper")
-
-    audio_value = st.audio_input("record a voice message to transcribe")
-
-    if audio_value:
-        with st.spinner("Transcribing..."):
-            transcript = voice_chat_with_gpt(audio_value)
-            transcript_text = transcript.text
-            st.write(transcript_text)
+    run_chat_session(
+        state_key="chef_messages",
+        system_prompt=system_prompt,
+        welcome_message=welcome,
+        audio_label="Speak to Chef",
+        text_label="Or type your craving here...",
+        key_prefix="chef",
+        assistant_avatar="👨‍🍳",
+        bg_color="#F4C4A2"
+    )
 
 def render_reviews_chat():
-    st.markdown(f"# {list(page_names_to_funcs.keys())[2]} ⭐")
+    st.title("📱 Rev's Vibe Check")
+    st.caption("Drop a restaurant name. I'll tell you if it's bussin' or mid.")
+
     system_prompt_r = {
         "role": "system",
-        "content": "You are a restaurant review chatbot. "
-        "You provide detailed and honest reviews of restaurants based on user input. "
-        "You respond as a knowledgeable food critic with a passion for dining out. You do not over explain yourself but you are very informative and helpful. Keep your responses concise and engaging."
-        "You can provide information about the food, service, ambiance, and overall experience at the restaurant. "
-        "You can also provide recommendations for similar restaurants based on the user's preferences. "
-        "Your tone is friendly, informative, and engaging. You aim to help users make informed decisions about where to eat. "
-        "You do not give recommendations only reviews and images of the restaurant. You can pull information from real reviews online but you cannot make up reviews. If you don't know about a restaurant, say you don't know instead of making something up."
+        "content": (
+            "You are Rev, a brutally honest Gen Z food critic and TikToker. "
+            "You review restaurants based on real-world reputation, star ratings, and vibes. "
+            "RULES: "
+            "1. You only care about restaurant reviews, aesthetics, and vibes. "
+            "2. OUT OF SCOPE GUARDRAIL: If the user asks about the weather, homework, news, or anything not related to food/vibes, you MUST refuse. "
+            "3. REFUSAL BEHAVIOR: (e.g., 'Bro, why are you asking me about that? I literally only care about food and vibes. Keep it on topic or I am ghosting.') "
+            "4. Always include a hypothetical Vibe Score out of 10 for restaurants. "
+            "5. End your review by asking what other spot they are thinking about."
+        )
     }
-    if "messages" not in st.session_state:
-        st.session_state.messages = [system_prompt_r]
+    welcome = "Sup. I'm Rev. ⭐ Drop a restaurant name and let's see if it's actually fire or just an aesthetic trap."
 
-    if len(st.session_state.messages) == 1:
-        review_message = """
-            I'm Rev your Reviewer ⭐
-            Let's find you something amazing reviews!
-        """
-        st.session_state.messages.append({"role": "assistant", "content": review_message})
-    for message in st.session_state.messages[1:]:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+    def fetch_rev_photo(prompt_text):
+        place_photo = get_google_place_photo(prompt_text, city="Baltimore")
+        if place_photo:
+            if place_photo.get("photo_url"):
+                st.image(
+                    place_photo["photo_url"],
+                    caption=place_photo["name"] + " — " + place_photo.get("address", ""),
+                    use_container_width=True,
+                )
+            else:
+                st.caption("Found " + place_photo["name"] + " but no photo was available.")
+        else:
+            st.caption("Couldn't find a matching restaurant photo.")
 
-    if prompt := st.chat_input("Type your message here..."):
-        print("User input:", prompt)
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
+    run_chat_session(
+        state_key="rev_messages",
+        system_prompt=system_prompt_r,
+        welcome_message=welcome,
+        audio_label="Spill the tea",
+        text_label="Or type a restaurant name...",
+        key_prefix="rev",
+        assistant_avatar="🕶️",
+        custom_action=fetch_rev_photo,
+        bg_color="#D7BCF8"
+    )
 
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                response = chat_with_gpt(st.session_state.messages)
-            st.write(response)
+def render_macro_chat():
+    st.title("💪 The Macro Hacker")
+    st.caption("Tell me the restaurant, I'll tell you how to keep your gains.")
 
-        st.session_state.messages.append({"role": "assistant", "content": response})
+    system_prompt = {
+        "role": "system",
+        "content": (
+            "You are the Macro Hacker, an intense, highly analytical fitness and nutrition coach. "
+            "Your tone is encouraging but strict, using terms like macros, gains, empty carbs, and protein synthesis. "
+            "RULES: "
+            "1. You are exclusively focused on restaurant nutrition, macros, and fitness goals. "
+            "2. OUT OF SCOPE GUARDRAIL: If the user asks about topics outside of nutrition, meal planning, or restaurants, you MUST refuse. "
+            "3. REFUSAL BEHAVIOR: (e.g., 'Focus! We do not care about the weather unless it is raining protein. Stick to the meal plan. What restaurant are we analyzing?') "
+            "4. Recommend the highest protein, most nutrient-dense meal on their menu. "
+            "5. Estimate the calories and macro split (Protein/Carbs/Fat) for your recommendation."
+        )
+    }
+    welcome = "Let's optimize this meal. 🏋️‍♂️ Drop a restaurant name, and I'll build you a plate that fits your macros."
 
+    run_chat_session(
+        state_key="macro_messages",
+        system_prompt=system_prompt,
+        welcome_message=welcome,
+        audio_label="Log audio",
+        text_label="Or type the restaurant here...",
+        key_prefix="macro",
+        assistant_avatar="🥗",
+        bg_color="#BDE7CB"
+    )
 
+def render_date_chat():
+    st.title("🕯️ Date Night Architect")
+    st.caption("Ambiance is everything. Let's set the mood.")
+
+    system_prompt = {
+        "role": "system",
+        "content": (
+            "You are the Date Night Architect, a suave, observant, and highly romantic concierge. "
+            "You care more about lighting, noise levels, seating arrangements, and intimacy than just the food. "
+            "RULES: "
+            "1. You deal exclusively with dating, romance, ambiance, and restaurant reservations. "
+            "2. OUT OF SCOPE GUARDRAIL: If the user asks about general trivia, weather, or non-romantic topics, you MUST refuse elegantly. "
+            "3. REFUSAL BEHAVIOR: 'I am afraid I must politely decline. My expertise lies solely in matters of the heart and evening reservations. Shall we return to planning your date?' "
+            "4. Ask questions about the relationship stage (e.g., first date, 10th anniversary). "
+            "5. Recommend places with the perfect vibe for their specific situation."
+        )
+    }
+    welcome = "Good evening. 🥂 A memorable date is about the environment as much as the food. Tell me, is this a first date, an anniversary, or a 'just because' evening out?"
+
+    run_chat_session(
+        state_key="date_messages",
+        system_prompt=system_prompt,
+        welcome_message=welcome,
+        audio_label="Speak softly",
+        text_label="Or type the occasion here...",
+        key_prefix="date",
+        assistant_avatar="🍷",
+        bg_color="#F77CA1"
+    )
+
+def render_roulette_chat():
+    st.title("🎯 Food Roulette")
+    st.caption("Can't decide? I'll make the choice for you. No arguments allowed.")
+
+    system_prompt = {
+        "role": "system",
+        "content": (
+            "You are the Roulette Master. Your job is to end the 'I don't know, what do you want?' argument. "
+            "Your tone is fast-paced, decisive, and authoritative. "
+            "RULES: "
+            "1. You only exist to force the user to pick a restaurant. "
+            "2. OUT OF SCOPE GUARDRAIL: You do not tolerate small talk. If they ask about the weather or anything else, you MUST refuse. "
+            "3. REFUSAL BEHAVIOR: (e.g., 'Stop stalling. I do not care about the weather or your day. Give me your city and your dealbreakers, NOW.') "
+            "4. Ask rapid-fire questions: City? Price limit? Any allergies? "
+            "5. Once you have that data, make ONE definitive recommendation. Do not give options. The decision is final."
+        )
+    }
+    welcome = "I end arguments. 🛑 You get ONE choice, and you have to eat there. To start the roulette wheel, tell me your city and your absolute dealbreakers (allergies/diets)."
+
+    run_chat_session(
+        state_key="roulette_messages",
+        system_prompt=system_prompt,
+        welcome_message=welcome,
+        audio_label="Spin the wheel",
+        text_label="Or type your city and dealbreakers...",
+        key_prefix="roulette",
+        assistant_avatar="🎰",
+        bg_color="#E5DBAA"
+    )
 
 page_names_to_funcs = {
-    "Text Chat": render_text_chat,
-    "Voice Chat": render_voice_chat,
-    "Reviews": render_reviews_chat,
+    "Chef Dee (Recommendations)": render_text_chat,
+    "Rev (Vibe Check)": render_reviews_chat,
+    "The Macro Hacker (Fitness)": render_macro_chat,
+    "Date Night Architect (Ambiance)": render_date_chat,
+    "Food Roulette (Indecisive)": render_roulette_chat,
 }
 
-selected_demo = st.sidebar.selectbox("Choose a demo", page_names_to_funcs.keys())
+st.sidebar.title("Navigation")
+selected_demo = st.sidebar.selectbox("Choose your AI Guide", page_names_to_funcs.keys())
 page_names_to_funcs[selected_demo]()
