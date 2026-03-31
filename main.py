@@ -167,6 +167,11 @@ def render_text_chat():
         bg_color="#F4C4A2"
     )
 
+    st.markdown(
+        "<style>.stSidebar { background-color: #F4C4A2 !important; }</style>",
+        unsafe_allow_html=True
+    )
+
 def render_reviews_chat():
     st.title("📱 Rev's Vibe Check")
     st.caption("Drop a restaurant name. I'll tell you if it's bussin' or mid.")
@@ -187,6 +192,11 @@ def render_reviews_chat():
 
     st.markdown(
         "<style>.stApp { background-color: #D7BCF8 !important; }</style>",
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        "<style>.stSidebar { background-color: #D7BCF8 !important; }</style>",
         unsafe_allow_html=True
     )
 
@@ -312,6 +322,11 @@ def render_macro_chat():
         bg_color="#BDE7CB"
     )
 
+    st.markdown(
+        "<style>.stSidebar { background-color: #BDE7CB !important; }</style>",
+        unsafe_allow_html=True
+    )
+
 def render_date_chat():
     st.title("🕯️ Date Night Architect")
     st.caption("Ambiance is everything. Let's set the mood.")
@@ -343,6 +358,11 @@ def render_date_chat():
         bg_color="#F77CA1"
     )
 
+    st.markdown(
+        "<style>.stSidebar { background-color: #F77CA1 !important; }</style>",
+        unsafe_allow_html=True
+    )
+
 def render_roulette_chat():
     st.title("🎯 Food Roulette")
     st.caption("Can't decide? I'll make the choice for you. No arguments allowed.")
@@ -371,6 +391,11 @@ def render_roulette_chat():
         key_prefix="roulette",
         assistant_avatar="🎰",
         bg_color="#E5DBAA"
+    )
+
+    st.markdown(
+        "<style>.stSidebar { background-color: #E5DBAA !important; }</style>",
+        unsafe_allow_html=True
     )
 
 page_names_to_funcs = {
