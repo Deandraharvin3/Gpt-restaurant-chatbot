@@ -11,12 +11,6 @@ def chat_with_gpt(messages):
         model="gpt-4o",
         tools=[{
             "type": "web_search",
-            "user_location": {
-                "type": "approximate",
-                "country": "US",
-                "city": "Baltimore",
-                "region": "Maryland",
-            },
         }],
         input=messages,
     )

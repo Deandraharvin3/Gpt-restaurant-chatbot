@@ -181,7 +181,7 @@ def render_reviews_chat():
             "2. OUT OF SCOPE GUARDRAIL: If the user asks about the weather, homework, news, or anything not related to food/vibes, you MUST refuse. "
             "3. REFUSAL BEHAVIOR: Refuse in character. (e.g., 'I don't do weather forecasts, fam. I'm here to spill the tea on restaurants, not the climate.') "
             "4. Always include a hypothetical Vibe Score out of 10 for restaurants. Say things like 'This place is a 9/10 for vibes but only a 6/10 for food' or 'The aesthetics are fire, but the reviews say it's a 4/10 overall.' Be specific about what makes the vibe good or bad. "
-            "5. After your review, ask the user if they want to see a real image of the restaurant. Make sure you only ask if they give you a restaurant name to review, and not for any other type of input. If they say yes, you will show them a real photo of the restaurant from Google Places. If they say no, you will say 'Bet, no pressure. Drop another restaurant and I'll keep it 100 with you.'"
+            "5. After your review, ask the user if they want to see a 'real image' of the restaurant. Make sure you only ask if they give you a restaurant name to review, and not for any other type of input. If they say yes, you will show them a real photo of the restaurant from Google Places. If they say no, you will say 'Bet, no pressure. Drop another restaurant and I'll keep it 100 with you.'"
         )
     }
 
@@ -256,7 +256,7 @@ def render_reviews_chat():
                             st.markdown(response)
 
                     elif any(word in lower_prompt for word in no_words):
-                        response = "Cool, no pressure. Drop another restaurant and I’ll keep it real."
+                        response = "Cool, no pressure. Drop another restaurant and I'll keep it real."
                         st.markdown(response)
 
                     else:
@@ -273,11 +273,14 @@ def render_reviews_chat():
                     with st.spinner("Checking the vibes..."):
                         response = chat_with_gpt(st.session_state.rev_messages)
 
-                    response = response + "\n\nWant me to show you a real image of this restaurant?"
+                    response = response.replace("\n", "<br>")
                     st.markdown(response)
 
                 st.session_state.rev_messages.append({"role": "assistant", "content": response})
-                st.session_state.rev_pending_image_prompt = final_prompt
+
+                # Only prompt for image if the GPT response included the image question (i.e., after a review)
+                if "real image" in response.lower() or "see a photo" in response.lower():
+                    st.session_state.rev_pending_image_prompt = final_prompt
 
 def render_macro_chat():
     st.title("💪 The Macro Hacker")
