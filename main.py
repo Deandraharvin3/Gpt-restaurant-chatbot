@@ -51,6 +51,10 @@ if "date_messages" not in st.session_state:
     st.session_state.date_messages = []
 if "roulette_messages" not in st.session_state:
     st.session_state.roulette_messages = []
+if "selected_demo" not in st.session_state:
+    st.session_state.selected_demo = "Chef Dee (Recommendations)"
+if "redirect_to" not in st.session_state:
+    st.session_state.redirect_to = None
 
 def run_chat_session(state_key, system_prompt, welcome_message, audio_label, text_label, key_prefix, assistant_avatar="🤖", bg_color="#FFFFFF"):
 
@@ -77,6 +81,25 @@ def run_chat_session(state_key, system_prompt, welcome_message, audio_label, tex
             final_prompt = transcript.text
     elif text_prompt:
         final_prompt = text_prompt
+
+    if final_prompt:
+        lower_prompt = final_prompt.lower()
+        redirect_conditions = {
+            "Chef Dee (Recommendations)": ["recommend", "suggest", "where should i eat", "what's good", "i'm craving"],
+            "Rev (Vibe Check)": ["review", "vibe", "rate", "rating", "is it good", "vibe check"],
+            "The Macro Hacker (Fitness)": ["macro", "protein", "calories", "nutrition", "diet"],
+            "Date Night Architect (Ambiance)": ["date", "romantic", "anniversary", "candlelight", "ambiance"],
+            "Food Roulette (Indecisive)": ["decide", "roulette", "wheel", "choose for me", "i don't know"]
+        }
+
+        for target_page, keywords in redirect_conditions.items():
+            if state_key != "rev_messages" or target_page != "Rev (Vibe Check)":
+                if any(word in lower_prompt for word in keywords):
+                    st.warning(
+                        "Redirecting you to" + target_page + " because you asked something about '" + keywords[0] + "'-style intent."
+                    )
+                    st.session_state.redirect_to = target_page
+                    st.experimental_rerun()
 
     with chat_container:
         for message in st.session_state[state_key][1:]:
@@ -339,5 +362,16 @@ page_names_to_funcs = {
 }
 
 st.sidebar.title("Navigation")
-selected_demo = st.sidebar.selectbox("Choose your AI Guide", page_names_to_funcs.keys())
+
+if st.session_state.redirect_to:
+    st.session_state.selected_demo = st.session_state.redirect_to
+    st.session_state.redirect_to = None
+
+selected_demo = st.sidebar.selectbox(
+    "Choose your AI Guide",
+    list(page_names_to_funcs.keys()),
+    index=list(page_names_to_funcs.keys()).index(st.session_state.selected_demo),
+    key="selected_demo"
+)
+
 page_names_to_funcs[selected_demo]()
