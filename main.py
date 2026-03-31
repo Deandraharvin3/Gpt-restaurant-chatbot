@@ -43,6 +43,8 @@ if "chef_messages" not in st.session_state:
     st.session_state.chef_messages = []
 if "rev_messages" not in st.session_state:
     st.session_state.rev_messages = []
+if "rev_pending_image_prompt" not in st.session_state:
+    st.session_state.rev_pending_image_prompt = None
 if "macro_messages" not in st.session_state:
     st.session_state.macro_messages = []
 if "date_messages" not in st.session_state:
@@ -50,7 +52,7 @@ if "date_messages" not in st.session_state:
 if "roulette_messages" not in st.session_state:
     st.session_state.roulette_messages = []
 
-def run_chat_session(state_key, system_prompt, welcome_message, audio_label, text_label, key_prefix, assistant_avatar="🤖", custom_action=None, bg_color="#FFFFFF"):
+def run_chat_session(state_key, system_prompt, welcome_message, audio_label, text_label, key_prefix, assistant_avatar="🤖", bg_color="#FFFFFF"):
 
     st.markdown(
         "<style>.stApp { background-color: " + bg_color + " !important; }</style>", 
@@ -91,9 +93,6 @@ def run_chat_session(state_key, system_prompt, welcome_message, audio_label, tex
                 with st.spinner("Thinking..."):
                     response = chat_with_gpt(st.session_state[state_key])
                 st.markdown(response)
-
-                if custom_action:
-                    custom_action(final_prompt)
 
             st.session_state[state_key].append({"role": "assistant", "content": response})
 
@@ -141,36 +140,103 @@ def render_reviews_chat():
             "2. OUT OF SCOPE GUARDRAIL: If the user asks about the weather, homework, news, or anything not related to food/vibes, you MUST refuse. "
             "3. REFUSAL BEHAVIOR: (e.g., 'Bro, why are you asking me about that? I literally only care about food and vibes. Keep it on topic or I am ghosting.') "
             "4. Always include a hypothetical Vibe Score out of 10 for restaurants. "
-            "5. End your review by asking what other spot they are thinking about."
+            "5. After your review, ask the user if they want to see a real image of the restaurant. "
         )
     }
-    welcome = "Sup. I'm Rev. ⭐ Drop a restaurant name and let's see if it's actually fire or just an aesthetic trap."
 
-    def fetch_rev_photo(prompt_text):
-        place_photo = get_google_place_photo(prompt_text, city="Baltimore")
-        if place_photo:
-            if place_photo.get("photo_url"):
-                st.image(
-                    place_photo["photo_url"],
-                    caption=place_photo["name"] + " — " + place_photo.get("address", ""),
-                    use_container_width=True,
-                )
-            else:
-                st.caption("Found " + place_photo["name"] + " but no photo was available.")
-        else:
-            st.caption("Couldn't find a matching restaurant photo.")
-
-    run_chat_session(
-        state_key="rev_messages",
-        system_prompt=system_prompt_r,
-        welcome_message=welcome,
-        audio_label="Spill the tea",
-        text_label="Or type a restaurant name...",
-        key_prefix="rev",
-        assistant_avatar="🕶️",
-        custom_action=fetch_rev_photo,
-        bg_color="#D7BCF8"
+    st.markdown(
+        "<style>.stApp { background-color: #D7BCF8 !important; }</style>",
+        unsafe_allow_html=True
     )
+
+    if not st.session_state.rev_messages:
+        st.session_state.rev_messages = [system_prompt_r]
+        st.session_state.rev_messages.append({
+            "role": "assistant",
+            "content": "Sup. I'm Rev. ⭐ Drop a restaurant name and let's see if it's actually fire or just an aesthetic trap."
+        })
+
+    chat_container = st.container()
+
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        audio_value = st.audio_input("Spill the tea", key="rev_audio")
+    with col2:
+        text_prompt = st.chat_input("Or type a restaurant name...", key="rev_text")
+
+    final_prompt = None
+    if audio_value:
+        with st.spinner("Listening..."):
+            transcript = voice_chat_with_gpt(audio_value)
+            final_prompt = transcript.text
+    elif text_prompt:
+        final_prompt = text_prompt
+
+    with chat_container:
+        for message in st.session_state.rev_messages[1:]:
+            avatar = "🕶️" if message["role"] == "assistant" else "👤"
+            with st.chat_message(message["role"], avatar=avatar):
+                st.markdown(message["content"])
+
+        if final_prompt:
+            st.session_state.rev_messages.append({"role": "user", "content": final_prompt})
+            with st.chat_message("user", avatar="👤"):
+                st.markdown(final_prompt)
+
+            lower_prompt = final_prompt.lower().strip()
+
+            yes_words = ["yes", "yeah", "yep", "sure", "ok", "okay", "show me", "image", "photo", "pic", "picture"]
+            no_words = ["no", "nope", "nah", "not now"]
+
+            if st.session_state.rev_pending_image_prompt is not None:
+                with st.chat_message("assistant", avatar="🕶️"):
+                    if any(word in lower_prompt for word in yes_words):
+                        st.markdown("Bet. Here’s the real photo 👀")
+
+                        place_photo = get_google_place_photo(
+                            st.session_state.rev_pending_image_prompt,
+                            city="Baltimore"
+                        )
+
+                        if place_photo:
+                            if place_photo.get("photo_url"):
+                                st.image(
+                                    place_photo["photo_url"],
+                                    caption=place_photo["name"] + " — " + place_photo.get("address", ""),
+                                    use_container_width=True
+                                )
+                                response = "You got another spot you want me to vibe check?"
+                                st.markdown(response)
+                            else:
+                                response = "I found the place, but no photo was available. Got another restaurant?"
+                                st.markdown(response)
+                        else:
+                            response = "Couldn't find a matching restaurant photo. Got another spot?"
+                            st.markdown(response)
+
+                    elif any(word in lower_prompt for word in no_words):
+                        response = "Cool, no pressure. Drop another restaurant and I’ll keep it real."
+                        st.markdown(response)
+
+                    else:
+                        response = "I need a yes or no. Do you want the real restaurant image or not?"
+                        st.markdown(response)
+
+                st.session_state.rev_messages.append({"role": "assistant", "content": response})
+
+                if any(word in lower_prompt for word in yes_words) or any(word in lower_prompt for word in no_words):
+                    st.session_state.rev_pending_image_prompt = None
+
+            else:
+                with st.chat_message("assistant", avatar="🕶️"):
+                    with st.spinner("Checking the vibes..."):
+                        response = chat_with_gpt(st.session_state.rev_messages)
+
+                    response = response + "\n\nWant me to show you a real image of this restaurant?"
+                    st.markdown(response)
+
+                st.session_state.rev_messages.append({"role": "assistant", "content": response})
+                st.session_state.rev_pending_image_prompt = final_prompt
 
 def render_macro_chat():
     st.title("💪 The Macro Hacker")
