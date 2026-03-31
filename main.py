@@ -52,6 +52,39 @@ if "date_messages" not in st.session_state:
 if "roulette_messages" not in st.session_state:
     st.session_state.roulette_messages = []
 
+_chat_intent_map = {
+    "rev_messages": {
+        "name": "Rev (Vibe Check)",
+        "keywords": ["review", "vibe", "rate", "rating", "is it good", "vibe check", "aesthetic"],
+    },
+    "macro_messages": {
+        "name": "The Macro Hacker (Fitness)",
+        "keywords": ["macro", "protein", "calories", "nutrition", "diet", "carbs", "fat"],
+    },
+    "date_messages": {
+        "name": "Date Night Architect (Ambiance)",
+        "keywords": ["date", "romantic", "anniversary", "candlelight", "ambiance", "mood"],
+    },
+    "chef_messages": {
+        "name": "Chef Dee (Recommendations)",
+        "keywords": ["recommend", "suggest", "menu", "place", "food", "craving", "budget"],
+    },
+    "roulette_messages": {
+        "name": "Food Roulette (Indecisive)",
+        "keywords": ["city", "dealbreakers", "argument", "choose", "can't decide"],
+    },
+}
+
+def detect_best_chat_for_prompt(active_state_key, prompt_text):
+    normalized = prompt_text.lower()
+    for key, info in _chat_intent_map.items():
+        if key == active_state_key:
+            continue
+        if any(k in normalized for k in info["keywords"]):
+            return info["name"]
+    return None
+
+
 def run_chat_session(state_key, system_prompt, welcome_message, audio_label, text_label, key_prefix, assistant_avatar="🤖", bg_color="#FFFFFF"):
 
     st.markdown(
@@ -86,6 +119,14 @@ def run_chat_session(state_key, system_prompt, welcome_message, audio_label, tex
 
         if final_prompt:
             st.session_state[state_key].append({"role": "user", "content": final_prompt})
+
+            # Inform user of better chat persona match, instead of auto-redirecting
+            suggested_chat = detect_best_chat_for_prompt(state_key, final_prompt)
+            if suggested_chat is not None:
+                st.info(
+                    "Heads up: your question looks like a great fit for '" + suggested_chat + "'. "
+                    "Try that tab so the bot can provide the most focused response. "
+                )
             with st.chat_message("user", avatar="👤"):
                 st.markdown(final_prompt)
 
@@ -138,9 +179,9 @@ def render_reviews_chat():
             "RULES: "
             "1. You only care about restaurant reviews, aesthetics, and vibes. Give the user the tea on whether it's actually good or just looks good on Instagram. "
             "2. OUT OF SCOPE GUARDRAIL: If the user asks about the weather, homework, news, or anything not related to food/vibes, you MUST refuse. "
-            "3. REFUSAL BEHAVIOR: (e.g., 'Bro, why are you asking me about that? I literally only care about food and vibes. Keep it on topic or I am ghosting.') "
-            "4. Always include a hypothetical Vibe Score out of 10 for restaurants. "
-            "5. After your review, ask the user if they want to see a real image of the restaurant. "
+            "3. REFUSAL BEHAVIOR: Refuse in character. (e.g., 'I don't do weather forecasts, fam. I'm here to spill the tea on restaurants, not the climate.') "
+            "4. Always include a hypothetical Vibe Score out of 10 for restaurants. Say things like 'This place is a 9/10 for vibes but only a 6/10 for food' or 'The aesthetics are fire, but the reviews say it's a 4/10 overall.' Be specific about what makes the vibe good or bad. "
+            "5. After your review, ask the user if they want to see a real image of the restaurant. Make sure you only ask if they give you a restaurant name to review, and not for any other type of input. If they say yes, you will show them a real photo of the restaurant from Google Places. If they say no, you will say 'Bet, no pressure. Drop another restaurant and I'll keep it 100 with you.'"
         )
     }
 
