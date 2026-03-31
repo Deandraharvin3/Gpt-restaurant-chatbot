@@ -273,13 +273,12 @@ def render_reviews_chat():
                     with st.spinner("Checking the vibes..."):
                         response = chat_with_gpt(st.session_state.rev_messages)
 
-                    response = response.replace("\n", "<br>")
                     st.markdown(response)
 
                 st.session_state.rev_messages.append({"role": "assistant", "content": response})
 
                 # Only prompt for image if the GPT response included the image question (i.e., after a review)
-                if "real image" in response.lower() or "see a photo" in response.lower():
+                if "real image" in response.lower() or "see a photo" in response.lower() or "real pic" in response.lower() or "looks like" in response.lower():
                     st.session_state.rev_pending_image_prompt = final_prompt
 
 def render_macro_chat():
